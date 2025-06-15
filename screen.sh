@@ -347,7 +347,7 @@ if [ "$CAMERA_RECORD" = "yes" ]; then
     # Create temporary files for camera and screen recording
     TEMP_DIR=$(mktemp -d)
     SCREEN_FILE="$TEMP_DIR/screen.mp4"
-    CAMERA_FILE="$TEMP_DIR/camera.mp4"
+    CAMERA_FILE="$TEMP_DIR/camera.mkv"  # Changed to MKV format which worked for you
     
     echo "Press Ctrl+C to stop recording"
     echo ""
@@ -363,10 +363,10 @@ if [ "$CAMERA_RECORD" = "yes" ]; then
         exit 1
     fi
     
-    ffmpeg -f v4l2 -video_size 640x480 -framerate 30 -i "$CAMERA_DEVICE" \
-        -c:v libx264 -preset ultrafast -crf 23 -pix_fmt yuv420p \
-        -avoid_negative_ts make_zero -fflags +genpts \
-        "$CAMERA_FILE" -y 2>/dev/null &
+    # MODIFIED: Using the settings that worked in your test
+    ffmpeg -f v4l2 -video_size 640x480 -framerate 15 -i "$CAMERA_DEVICE" \
+        -c:v libx264 -preset ultrafast -crf 28 -pix_fmt yuv420p \
+        -t 14400 "$CAMERA_FILE" -y > /dev/null 2>&1 &
     CAMERA_PID=$!
     
     # Wait a moment for camera to initialize
@@ -431,10 +431,11 @@ if [ "$CAMERA_RECORD" = "yes" ]; then
             echo "Merging camera overlay with screen recording..."
             echo "Camera overlay: ${CAM_WIDTH}x${CAM_HEIGHT} at position (${CAM_X},${CAM_Y})"
             
-            # Merge videos with camera overlay in bottom-right with grey border
+            # MODIFIED: Simplified ffmpeg command with more compatible settings
             if ffmpeg -i "$SCREEN_FILE" -i "$CAMERA_FILE" \
-                -filter_complex "[1:v]scale=${CAM_WIDTH}:${CAM_HEIGHT},pad=${CAM_WIDTH}+6:${CAM_HEIGHT}+6:3:3:gray[cam_bordered];[0:v][cam_bordered]overlay=${CAM_X}:${CAM_Y}[out]" \
-                -map "[out]" -map 0:a? -c:a copy -c:v libx264 -preset medium -crf 23 "$FILENAME" -y 2>/dev/null; then
+                -filter_complex "[1:v]scale=${CAM_WIDTH}:${CAM_HEIGHT}[cam];[0:v][cam]overlay=${CAM_X}:${CAM_Y}[out]" \
+                -map "[out]" -map 0:a? -c:a copy -c:v libx264 -preset medium -crf 23 \
+                "$FILENAME" -y > /dev/null 2>&1; then
                 echo "✓ Camera overlay merge completed successfully"
             else
                 echo "⚠ Camera overlay merge failed, saving screen recording only..."
@@ -497,3 +498,10 @@ else
         exit 1
     fi
 fi
+EOF
+
+# Make the script executable
+chmod +x scripts/Screen/screen_fixed.sh
+
+echo "Created modified script at scripts/Screen/screen_fixed.sh"
+echo "Run it with: ./scripts/Screen/screen_fixed.sh"
